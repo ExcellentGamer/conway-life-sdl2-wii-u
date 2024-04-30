@@ -24,8 +24,8 @@ Cells record their age. Red cells are volatile and changing; the older stationar
 
 ## Building
 ### Dependencies
--[wut](https://github.com/devkitPro/wut)
--SDL2
+- [wut](https://github.com/devkitPro/wut)
+- SDL2 Wii U
 
 Install Devkitpro following [the offial guide for your OS](https://devkitpro.org/wiki/Getting_Started)
 
