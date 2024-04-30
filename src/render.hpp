@@ -1,4 +1,4 @@
-#include <SDL2/SDL_render.h>
+#include <SDL_render.h>
 
 typedef struct
 {
