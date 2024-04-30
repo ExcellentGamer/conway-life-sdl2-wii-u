@@ -1,4 +1,4 @@
-# conway-life-sdl2
+# Conway Game of life SDL2 Wii U
 An implementation of Conway's Game of Life in C/C++ and SDL2.
 
 ![Alt Text](media/showcase_01.gif)
@@ -48,4 +48,5 @@ make (path to Makefile)
 # Credits
 - [MatthewDiMarco](https://github.com/MatthewDiMarco) Made the original program
 - [Ashquarky](https://github.com/ashquarky) For porting SDL2 to Wii U
+- [Dimok](https://github.com/dimok789) For making VPADInput.h and WPADInput.h
 - [GaryOderNichts](https://github.com/GaryOderNichts) For making Wii U ident which I used as 'base'
