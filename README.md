@@ -2,42 +2,50 @@
 An implementation of Conway's Game of Life in C/C++ and SDL2.
 
 ![Alt Text](media/showcase_01.gif)
-Create and destroy cells using LMB and RMB, respectively. Watch the beauty unfold.
+Create and destroy cells using A and B, respectively. Watch the beauty unfold.
 
 ![Alt Text](media/showcase_02.gif)
 Cells record their age. Red cells are volatile and changing; the older stationary cells emerge as green. Hovering the mouse over groups of cells will illuminate them.
 
 ## Controls
-- `Space`:        pause/play
-- `F`:            toggle wireframe
-- `C`:            toggle colorization
-- `Up arrow`:     slow down
-- `Down arrow`:   speed up
-- `Left mouse`:   spawn cell
-- `Right mouse`:  delete cell
-- `Mouse wheel`:  adjust spawn perimeter
+- `HOME`:       quit
+- `+`:          pause/play
+- `R`:          toggle wireframe
+- `L`:          toggle colorization
+- `ZR`:         reduce pointer speed
+- `ZL`:         increase pointer speed
+- `L Stick`:    move the pointer
+- `Dpad Up`:    slow down
+- `Dpad Down`:  speed up
+- `A`:          spawn cell
+- `B`:          delete cell
+- `X`:          grow spawn perimeter
+- `Y`:          shrink spawn perimeter
 
-## Setup: OS X
+## Building
 ### Dependencies
-Install SDL2 on your machine via homebrew:
+-[wut](https://github.com/devkitPro/wut)
+-SDL2
+
+Install Devkitpro following [the offial guide for your OS](https://devkitpro.org/wiki/Getting_Started)
+
+Install wut:
 ```
-brew install sdl2
+(sudo) (dkp-)pacman -Syu --needed wiiu-dev
 ```
 
-Although not required by this project, see also:
+Install SDL2 Wii U:
 ```
-sdl2_ttf
-sdl2_image
-sdl2_mixer
+(sudo) (dkp-)pacman -S wiiu-sdl2
 ```
 
-### Compiler
-Install Xcode (for the clang++ compiler, not the IDE)
+### Compiling
+Simply run `make` at the root of the repo
 ```
-xcode-select --install
+make (path to Makefile)
 ```
 
-Alternatively, just type `gcc` or `g++` in your terminal, and you'll be prompted to install anything that's missing.
-
-### Building
-See `Makefile` for details. 
+# Credits
+- [MatthewDiMarco](https://github.com/MatthewDiMarco) Made the original program
+- [Ashquarky](https://github.com/ashquarky) For porting SDL2 to Wii U
+- [GaryOderNichts](https://github.com/GaryOderNichts) For making Wii U ident which I used as 'base'
