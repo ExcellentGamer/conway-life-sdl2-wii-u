@@ -1,13 +1,23 @@
-#include <iostream>
-#include <SDL2/SDL.h>
+#include <coreinit/debug.h>
+#include <coreinit/title.h>
+#include <padscore/kpad.h>
+#include <sndcore2/core.h>
+#include <sysapp/launch.h>
+#include <whb/proc.h>
+#include <SDL.h>
+
+#include "input/CombinedInput.h"
+#include "input/VPADInput.h"
+#include "input/WPADInput.h"
+
 #include "game.hpp"
 #include "render.hpp"
 #include "util.hpp"
 
 // Constants
-const int WINDOW_WIDTH = 1280;
-const int WINDOW_HEIGHT = 720;
-const int UNIT_SIZE = 5;
+const int WINDOW_WIDTH = 1920;
+const int WINDOW_HEIGHT = 1080;
+const int UNIT_SIZE = 10;
 const int STEP_INCREMENT = 25;
 const int MIN_SPAWN_BOX_SIZE = 1;
 const int MAX_SPAWN_BOX_SIZE = (WINDOW_HEIGHT / UNIT_SIZE) / 2;
@@ -21,8 +31,11 @@ SDL_Event event;
 GameState *game_state;
 Uint64 delay;
 Uint64 ticks;
-int x_mouse, y_mouse;
-int mouse_buttons_state;
+int x_pointer = WINDOW_WIDTH / 2;
+int y_pointer = WINDOW_HEIGHT / 2;
+int pointer_speed = 2;
+int max_pointer_speed = 20;
+int min_pointer_speed = 1;
 int population_size;
 
 // Global controls
@@ -38,31 +51,30 @@ int spawn_box_size = 3;
 //
 int initialise()
 {
-    if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
+    if (SDL_Init(SDL_INIT_VIDEO) < 0)
     {
-        std::cout << "SDL_Init failed with error: " << SDL_GetError() << std::endl;
+        OSReport("SDL_Init failed with error: ", SDL_GetError(), "\n");
         return EXIT_FAILURE;
     }
 
     // Handle window creation
     main_window = SDL_CreateWindow(
         "Game of Life SDL2",
-        SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_UNDEFINED,
+        SDL_WINDOWPOS_UNDEFINED,
         WINDOW_WIDTH,
         WINDOW_HEIGHT,
-        SDL_WINDOW_OPENGL);
+        0);
 
     if (main_window == nullptr)
     {
-        std::cout << "SDL_CreateWindow failed with error: " << SDL_GetError() << std::endl;
+        OSReport("SDL_CreateWindow failed with error: ", SDL_GetError(), "\n");
         SDL_Quit();
         return EXIT_FAILURE;
     }
 
     // Handle renderer creation
-    main_renderer = SDL_CreateRenderer(main_window, -1, SDL_RENDERER_PRESENTVSYNC);
-
+    main_renderer = SDL_CreateRenderer(main_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     // Handle game state creation
     game_state = create_game_state(WINDOW_WIDTH, WINDOW_HEIGHT, UNIT_SIZE);
     population_size = 0;
@@ -84,26 +96,25 @@ void shutdown()
 //
 // Called every frame for handling input
 //
-void input()
+void input(Input &input)
 {
-    // Respond to mouse
-    mouse_buttons_state = SDL_GetMouseState(&x_mouse, &y_mouse);
-    if (mouse_buttons_state == 1 || mouse_buttons_state == 4)
+    // Delete / Create cells
+    if (input.data.buttons_h & Input::BUTTON_A || input.data.buttons_h & Input::BUTTON_B)
     {
         int offset = floor(spawn_box_size / 2);
-        int row_selected = x_mouse / UNIT_SIZE;
-        int col_selected = y_mouse / UNIT_SIZE;
+        int row_selected = x_pointer / UNIT_SIZE;
+        int col_selected = y_pointer / UNIT_SIZE;
         for (int ii = row_selected; ii < row_selected + spawn_box_size; ii++)
         {
             for (int jj = col_selected; jj < col_selected + spawn_box_size; jj++)
             {
                 int row = ii - offset;
                 int col = jj - offset;
-                if (mouse_buttons_state == 1)
+                if (input.data.buttons_h & Input::BUTTON_A)
                 {
                     spawn_cell(game_state, row, col, &population_size);
                 }
-                else if (mouse_buttons_state == 4)
+                else if (input.data.buttons_h & Input::BUTTON_B)
                 {
                     kill_cell(game_state, row, col, &population_size);
                 }
@@ -111,72 +122,122 @@ void input()
         }
     }
 
-    // Respond to events
-    if (SDL_PollEvent(&event))
+    // Move the pointer
+    if (input.data.buttons_h & Input::STICK_L_UP)
     {
-        switch (event.type)
-        {
-        case SDL_MOUSEWHEEL:
-        {
-            int sign = signnum(event.wheel.y);
-            if (sign == 1)
-            {
-                spawn_box_size = std::clamp(spawn_box_size * 2,
-                                            MIN_SPAWN_BOX_SIZE, MAX_SPAWN_BOX_SIZE);
-            }
-            else if (sign == -1)
-            {
-                spawn_box_size = std::clamp(spawn_box_size / 2,
-                                            MIN_SPAWN_BOX_SIZE, MAX_SPAWN_BOX_SIZE);
-            }
-            break;
-        }
+        y_pointer -= pointer_speed;
 
-        case SDL_KEYDOWN:
+        if (y_pointer < (0 - spawn_box_size))
         {
-            if (event.key.keysym.sym == SDLK_ESCAPE)
-            {
-                quit = true;
-            }
-            if (event.key.keysym.sym == SDLK_SPACE)
-            {
-                paused = !paused;
-                std::cout << "PAUSED: " << paused << std::endl;
-            }
-            if (event.key.keysym.sym == SDLK_f)
-            {
-                fill_cells = !fill_cells;
-                std::cout << "FILL: " << fill_cells << std::endl;
-            }
-            if (event.key.keysym.sym == SDLK_c)
-            {
-                color_cells = !color_cells;
-                std::cout << "COLOR: " << color_cells << std::endl;
-            }
-            if (event.key.keysym.sym == SDLK_UP)
-            {
-                int updated_step = std::clamp(step_length + STEP_INCREMENT,
-                                              MIN_STEP_LENGTH, MAX_STEP_LENGTH);
-                if (updated_step != step_length)
-                {
-                    step_length = updated_step;
-                    std::cout << "STEP: " << step_length << std::endl;
-                }
-            }
-            if (event.key.keysym.sym == SDLK_DOWN)
-            {
-                int updated_step = std::clamp(step_length - STEP_INCREMENT,
-                                              MIN_STEP_LENGTH, MAX_STEP_LENGTH);
-                if (updated_step != step_length)
-                {
-                    step_length = updated_step;
-                    std::cout << "STEP: " << step_length << std::endl;
-                }
-            }
-            break;
-        }
+            y_pointer = WINDOW_HEIGHT;
         }
     }
+
+    if (input.data.buttons_h & Input::STICK_L_DOWN)
+    {
+        y_pointer += pointer_speed;
+
+        if (y_pointer > (WINDOW_HEIGHT + spawn_box_size))
+        {
+            y_pointer = 0;
+        }
+    }
+
+    if (input.data.buttons_h & Input::STICK_L_LEFT)
+    {
+        x_pointer -= pointer_speed;
+
+        if (x_pointer < (0 - spawn_box_size))
+        {
+            x_pointer = WINDOW_WIDTH;
+        }
+    }
+
+    if (input.data.buttons_h & Input::STICK_L_RIGHT)
+    {
+        x_pointer += pointer_speed;
+
+        if (x_pointer > (WINDOW_WIDTH + spawn_box_size))
+        {
+            x_pointer = 0;
+        }
+    }
+
+    // Other inputs
+    if (input.data.buttons_d & Input::BUTTON_X) {
+        spawn_box_size = clamp(spawn_box_size * 2,
+                                            MIN_SPAWN_BOX_SIZE, MAX_SPAWN_BOX_SIZE);
+    } else if (input.data.buttons_d & Input::BUTTON_Y) {
+        spawn_box_size = clamp(spawn_box_size / 2,
+                                            MIN_SPAWN_BOX_SIZE, MAX_SPAWN_BOX_SIZE);
+    }
+
+    if (input.data.buttons_d & Input::BUTTON_HOME) {
+        quit = true;
+    }
+
+    if (input.data.buttons_d & Input::BUTTON_PLUS) {
+        paused = !paused;
+        OSReport("PAUSED: ", paused, "\n");
+    }
+
+    if (input.data.buttons_d & Input::BUTTON_R) {
+        fill_cells = !fill_cells;
+        OSReport("FILL: ", fill_cells, "\n");
+    }
+
+    if (input.data.buttons_d & Input::BUTTON_L) {
+        color_cells = !color_cells;
+        OSReport("COLOR: ", color_cells, "\n");
+    }
+
+    if (input.data.buttons_d & Input::BUTTON_ZL) {
+        pointer_speed++;
+
+        if (pointer_speed > max_pointer_speed)
+        {
+            pointer_speed = max_pointer_speed;
+        }
+    }
+
+    if (input.data.buttons_d & Input::BUTTON_ZR) {
+        pointer_speed --;
+
+        if (pointer_speed < min_pointer_speed)
+        {
+            pointer_speed = min_pointer_speed;
+        }
+    }
+
+    if (input.data.buttons_d & Input::BUTTON_UP) {
+        int updated_step = clamp(step_length + STEP_INCREMENT,
+                                        MIN_STEP_LENGTH, MAX_STEP_LENGTH);
+        if (updated_step != step_length)
+        {
+            step_length = updated_step;
+            OSReport("STEP: ", step_length, "\n");
+        }
+    }
+
+    if (input.data.buttons_d & Input::BUTTON_DOWN) {
+        int updated_step = clamp(step_length - STEP_INCREMENT,
+                                        MIN_STEP_LENGTH, MAX_STEP_LENGTH);
+        if (updated_step != step_length)
+        {
+            step_length = updated_step;
+            OSReport("STEP: ", step_length, "\n");
+        }
+    }
+
+    switch (event.type)
+        {
+        case SDL_QUIT:
+            quit = true;
+            break;
+
+        default:
+            break;
+        }
 }
 
 //
@@ -206,8 +267,8 @@ void update()
             {
                 if (color_cells)
                 {
-                    int distance_from_mouse = std::clamp(
-                        find_distance(x_mouse, y_mouse, ii * UNIT_SIZE, jj * UNIT_SIZE), 1, 255);
+                    int distance_from_mouse = clamp(
+                        find_distance(x_pointer, y_pointer, ii * UNIT_SIZE, jj * UNIT_SIZE), 1, 255);
                     render_set_color(main_renderer,
                                      {255 - game_state->front_buffer[ii][jj],
                                       game_state->front_buffer[ii][jj],
@@ -235,8 +296,8 @@ void update()
     // Spawn area
     render_set_color(main_renderer, COLOR_GRAY_LIGHT);
     render_rectangle(main_renderer,
-                     ((x_mouse / UNIT_SIZE) * UNIT_SIZE) - ((spawn_box_size) / 2 * UNIT_SIZE),
-                     ((y_mouse / UNIT_SIZE) * UNIT_SIZE) - ((spawn_box_size) / 2 * UNIT_SIZE),
+                     ((x_pointer / UNIT_SIZE) * UNIT_SIZE) - ((spawn_box_size) / 2 * UNIT_SIZE),
+                     ((y_pointer / UNIT_SIZE) * UNIT_SIZE) - ((spawn_box_size) / 2 * UNIT_SIZE),
                      (spawn_box_size)*UNIT_SIZE,
                      (spawn_box_size)*UNIT_SIZE, false);
 
@@ -244,23 +305,69 @@ void update()
     SDL_RenderPresent(main_renderer);
 }
 
+inline bool RunningFromMiiMaker() {
+    return (OSGetTitleID() & 0xFFFFFFFFFFFFF0FFull) == 0x000500101004A000ull;
+}
+
 //
 // Run demo
 //
-int main()
+int main(int argc, char const *argv[])
 {
     if (initialise() != EXIT_SUCCESS)
     {
         shutdown();
     }
 
+    WHBProcInit();
+
+    // Call AXInit to stop already playing sounds
+    AXInit();
+    AXQuit();
+
+    KPADInit();
+    WPADEnableURCC(TRUE);
+
+    CombinedInput baseInput;
+    VPadInput vpadInput;
+    WPADInput wpadInputs[4] = {
+            WPAD_CHAN_0,
+            WPAD_CHAN_1,
+            WPAD_CHAN_2,
+            WPAD_CHAN_3};
+
     delay = step_length;
-    while (!quit)
+    while (WHBProcIsRunning())
     {
-        input();
+        baseInput.reset();
+        if (vpadInput.update(1280, 720)) {
+            baseInput.combine(vpadInput);
+        }
+        for (auto &wpadInput : wpadInputs) {
+            if (wpadInput.update(1280, 720)) {
+                baseInput.combine(wpadInput);
+            }
+        }
+        baseInput.process();
+
+        input(baseInput);
+
+        if (quit)
+        {
+           if (RunningFromMiiMaker()) {
+                // Legacy way, just quit
+                break;
+            } else {
+                // Launch menu otherwise
+                SYSLaunchMenu();
+            }
+        }
+
         update();
     }
 
     shutdown();
+
+    WHBProcShutdown();
     return EXIT_SUCCESS;
 }
