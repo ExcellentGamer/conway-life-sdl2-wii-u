@@ -23,6 +23,8 @@ const int MIN_SPAWN_BOX_SIZE = 1;
 const int MAX_SPAWN_BOX_SIZE = (WINDOW_HEIGHT / UNIT_SIZE) / 2;
 const int MIN_STEP_LENGTH = 0;
 const int MAX_STEP_LENGTH = 100;
+const int MAX__POINTER_SPEED = 25;
+const int MIN_POINTER_SPEED = 1;
 
 // Global data
 SDL_Window *main_window;
@@ -34,8 +36,6 @@ Uint64 ticks;
 int x_pointer = WINDOW_WIDTH / 2;
 int y_pointer = WINDOW_HEIGHT / 2;
 int pointer_speed = 2;
-int max_pointer_speed = 20;
-int min_pointer_speed = 1;
 int population_size;
 
 // Global controls
@@ -191,22 +191,14 @@ void input(Input &input)
         OSReport("COLOR: ", color_cells, "\n");
     }
 
-    if (input.data.buttons_d & Input::BUTTON_ZL) {
-        pointer_speed++;
-
-        if (pointer_speed > max_pointer_speed)
-        {
-            pointer_speed = max_pointer_speed;
-        }
+    if (input.data.buttons_h & Input::BUTTON_ZR) {
+        pointer_speed = clamp(pointer_speed + 1,
+                                            MIN_POINTER_SPEED, MAX__POINTER_SPEED);
     }
 
-    if (input.data.buttons_d & Input::BUTTON_ZR) {
-        pointer_speed --;
-
-        if (pointer_speed < min_pointer_speed)
-        {
-            pointer_speed = min_pointer_speed;
-        }
+    if (input.data.buttons_h & Input::BUTTON_ZL) {
+        pointer_speed = clamp(pointer_speed - 1,
+                                            MIN_POINTER_SPEED, MAX__POINTER_SPEED);
     }
 
     if (input.data.buttons_d & Input::BUTTON_UP) {
