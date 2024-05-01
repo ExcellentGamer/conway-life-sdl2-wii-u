@@ -14,8 +14,8 @@ TOPDIR ?= $(CURDIR)
 # APP_AUTHOR sets the author of the application
 #-------------------------------------------------------------------------------
 APP_NAME		:= Game of Life
-APP_SHORTNAME	:= GoL
-APP_AUTHOR		:= Benchaton
+APP_SHORTNAME	:= Game of Life
+APP_AUTHOR		:= MathewDiMarco, Benchaton
 
 include $(DEVKITPRO)/wut/share/wut_rules
 
@@ -36,9 +36,9 @@ SOURCES		:=	src src/input
 DATA		:=
 INCLUDES	:=	source include
 CONTENT		:=
-ICON		:=
-TV_SPLASH	:=
-DRC_SPLASH	:=
+ICON		:=	media/icon.png
+TV_SPLASH	:=	media/bootDRC.png
+DRC_SPLASH	:=	media/bootDRC.png
 
 #-------------------------------------------------------------------------------
 # options for code generation
