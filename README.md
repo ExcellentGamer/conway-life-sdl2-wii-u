@@ -12,8 +12,8 @@ Cells record their age. Red cells are volatile and changing; the older stationar
 - `+`:          pause/play
 - `R`:          toggle wireframe
 - `L`:          toggle colorization
-- `ZR`:         reduce pointer speed
-- `ZL`:         increase pointer speed
+- `ZL`:         reduce pointer speed
+- `ZR`:         increase pointer speed
 - `L Stick`:    move the pointer
 - `Dpad Up`:    slow down
 - `Dpad Down`:  speed up
