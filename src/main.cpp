@@ -172,10 +172,6 @@ void input(Input &input)
                                             MIN_SPAWN_BOX_SIZE, MAX_SPAWN_BOX_SIZE);
     }
 
-    if (input.data.buttons_d & Input::BUTTON_HOME) {
-        quit = true;
-    }
-
     if (input.data.buttons_d & Input::BUTTON_PLUS) {
         paused = !paused;
         OSReport("PAUSED: ", paused, "\n");
