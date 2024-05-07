@@ -53,7 +53,7 @@ CXXFLAGS	:= $(CFLAGS) -std=gnu++20
 ASFLAGS	:=	$(ARCH)
 LDFLAGS	=	$(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:=	-lcurl -lSDL2 -lSDL2_ttf -lfreetype -lharfbuzz -lfreetype -lpng -lbz2 -lz -lmocha -lwut
+LIBS	:=	-lSDL2 -lwut
 
 #-------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level
@@ -147,8 +147,7 @@ $(BUILD):
 #-------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).wuhb $(TARGET).rpx $(TARGET).elf
-
+	@rm -fr $(BUILD) $(TARGET).wuhb $(TARGET).rpx
 #-------------------------------------------------------------------------------
 else
 .PHONY:	all
@@ -161,8 +160,6 @@ DEPENDS	:=	$(OFILES:.o=.d)
 all	:	$(OUTPUT).wuhb
 
 $(OUTPUT).wuhb : $(OUTPUT).rpx
-$(OUTPUT).rpx	:	$(OUTPUT).elf
-$(OUTPUT).elf	:	$(OFILES)
 
 $(OFILES_SRC)	: $(HFILES_BIN)
 
