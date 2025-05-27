@@ -24,10 +24,10 @@ SDL_Event event;
 const int WINDOW_WIDTH = 256;
 const int WINDOW_HEIGHT = 240;
 
-const float acceleration = 0.2;
-const int WALK_SPEED = 5;
+const float ACCELERATION = 0.1;
+const float GRAVITY = 0.5;
+const float WALK_SPEED = 2.5;
 const int RUN_SPEED = WALK_SPEED * 2;
-const int GRAVITY = 2;
 const int MARIO_WIDTH = 16;
 const int MARIO_HEIGHT = 16;
 
@@ -102,18 +102,18 @@ void input(Input &input) {
 
     // Horizontal movement
     if (direction == 1) {
-        horizontal_speed += acceleration;
+        horizontal_speed += ACCELERATION;
         if (horizontal_speed > max_speed) horizontal_speed = max_speed;
     } else if (direction == -1) {
-        horizontal_speed -= acceleration;
+        horizontal_speed -= ACCELERATION;
         if (horizontal_speed < -max_speed) horizontal_speed = -max_speed;
     } else {
         // Decelerate to stop
         if (horizontal_speed > 0) {
-            horizontal_speed -= acceleration;
+            horizontal_speed -= ACCELERATION;
             if (horizontal_speed < 0) horizontal_speed = 0;
         } else if (horizontal_speed < 0) {
-            horizontal_speed += acceleration;
+            horizontal_speed += ACCELERATION;
             if (horizontal_speed > 0) horizontal_speed = 0;
         }
     }
@@ -127,7 +127,7 @@ void input(Input &input) {
     }
 
     // Apply gravity
-    ((vertical_speed += GRAVITY) / 8);
+    vertical_speed += GRAVITY;
 
     if (!is_solid_at(mario_x + MARIO_WIDTH / 2, mario_y + vertical_speed + MARIO_HEIGHT)) {
         mario_y += vertical_speed;
@@ -144,7 +144,7 @@ void input(Input &input) {
 
     // Jumping
     if (jump_pressed && grounded) {
-        vertical_speed = -30; // jump strength
+        vertical_speed = -8; // jump strength
     }
 
     // Fall off screen reset
