@@ -12,6 +12,8 @@
 
 #include "render.hpp"
 #include "util.hpp"
+#include "level.hpp"
+#include "render.hpp"
 
 // Global data
 SDL_Window *main_window;
@@ -19,8 +21,8 @@ SDL_Renderer *main_renderer;
 SDL_Event event;
 
 // Constants
-const int WINDOW_WIDTH = 1280;
-const int WINDOW_HEIGHT = 720;
+const int WINDOW_WIDTH = 256;
+const int WINDOW_HEIGHT = 240;
 
 const float acceleration = 0.2;
 const int WALK_SPEED = 5;
@@ -118,27 +120,24 @@ void input(Input &input) {
 
     // Try moving horizontally
     SDL_Rect test_rect_x = makeSDLRectFromFloat(mario_x + horizontal_speed, mario_y, MARIO_WIDTH, MARIO_HEIGHT);
-    if (!checkRectCollision(test_rect_x, wall_rect)) {
+    if (!is_solid_at(mario_x + horizontal_speed, mario_y + MARIO_HEIGHT / 2)) {
         mario_x += horizontal_speed;
     } else {
         horizontal_speed = 0;
     }
 
     // Apply gravity
-    vertical_speed += GRAVITY;
+    ((vertical_speed += GRAVITY) / 8);
 
-    // Try moving vertically
-    SDL_Rect test_rect_y = makeSDLRectFromFloat(mario_x, mario_y + vertical_speed, MARIO_WIDTH, MARIO_HEIGHT);
-    if (!checkRectCollision(test_rect_y, wall_rect)) {
+    if (!is_solid_at(mario_x + MARIO_WIDTH / 2, mario_y + vertical_speed + MARIO_HEIGHT)) {
         mario_y += vertical_speed;
+        grounded = false;
     } else {
         if (vertical_speed > 0) {
-            // Landing on top of wall
-            mario_y = wall_rect.y - MARIO_HEIGHT;
+            mario_y = ((int)(mario_y + vertical_speed + MARIO_HEIGHT) / TILE_HEIGHT) * TILE_HEIGHT - MARIO_HEIGHT;
             grounded = true;
         } else if (vertical_speed < 0) {
-            // Hitting bottom of wall
-            mario_y = wall_rect.y + wall_rect.h;
+            mario_y = ((int)(mario_y + vertical_speed) / TILE_HEIGHT + 1) * TILE_HEIGHT;
         }
         vertical_speed = 0;
     }
@@ -175,9 +174,8 @@ void update() {
     render_rectangle(main_renderer,
                     mario_x, mario_y, 16, 16, true);
 
-    // Draw wall
-    render_set_color(main_renderer, COLOR_RED);
-    render_rectangle(main_renderer, wall_rect.x, wall_rect.y, wall_rect.w, wall_rect.h, true);
+    // Draw Level
+    render_level(main_renderer);
 
     SDL_Rect mario_rect = makeSDLRectFromFloat(mario_x, mario_y, MARIO_WIDTH, MARIO_HEIGHT);
     render_set_color(main_renderer, COLOR_CURSOR);
@@ -198,6 +196,7 @@ int main(int argc, char const *argv[]) {
     }
 
     WHBProcInit();
+    loadLevel("/vol/external01/smb/levels/level1.txt");
 
     // Call AXInit to stop already playing sounds
     AXInit();
