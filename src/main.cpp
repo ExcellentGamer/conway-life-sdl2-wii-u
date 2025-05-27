@@ -5,6 +5,7 @@
 #include <sysapp/launch.h>
 #include <whb/proc.h>
 #include <SDL.h>
+#include <SDL_image.h>
 
 #include "input/CombinedInput.h"
 #include "input/VPADInput.h"
@@ -15,7 +16,7 @@
 #include "level.hpp"
 
 // Constants
-const int WINDOW_WIDTH = 256;
+const int WINDOW_WIDTH = 3376;
 const int WINDOW_HEIGHT = 240;
 const float ACCELERATION = 0.1f;
 const float GRAVITY = 0.5f;
@@ -28,6 +29,10 @@ const int MARIO_HEIGHT = 16;
 SDL_Window* main_window;
 SDL_Renderer* main_renderer;
 SDL_Event event;
+
+// Textures
+SDL_Texture* mario_texture = NULL;
+SDL_Texture* ground_texture = NULL;
 
 float horizontal_speed = 0.0f;
 float vertical_speed = 0.0f;
@@ -42,7 +47,6 @@ SDL_Rect mario_rect = { (int)mario_x, (int)mario_y, MARIO_WIDTH, MARIO_HEIGHT };
 // Helpers
 bool is_solid_box(float x, float y, int w, int h) {
     const int step = 4;
-
     for (int dy = 0; dy <= h; dy += step) {
         for (int dx = 0; dx <= w; dx += step) {
             float sample_x = x + ((dx >= w) ? (w - 1) : dx);
@@ -51,6 +55,29 @@ bool is_solid_box(float x, float y, int w, int h) {
         }
     }
     return false;
+}
+
+SDL_Texture* load_texture(const char* path, SDL_Renderer* renderer) {
+    SDL_RWops* rw = SDL_RWFromFile(path, "rb");
+    if (!rw) {
+        OSReport("SDL_RWFromFile failed: %s\n", SDL_GetError());
+        return NULL;
+    }
+
+    SDL_Surface* surface = IMG_Load_RW(rw, 1);
+    if (!surface) {
+        OSReport("IMG_Load_RW failed: %s\n", IMG_GetError());
+        return NULL;
+    }
+
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_FreeSurface(surface);
+
+    if (!texture) {
+        OSReport("SDL_CreateTextureFromSurface failed: %s\n", SDL_GetError());
+    }
+
+    return texture;
 }
 
 int initialise() {
@@ -62,27 +89,55 @@ int initialise() {
     main_window = SDL_CreateWindow("Super Mario Bros.",
                                    SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                    WINDOW_WIDTH, WINDOW_HEIGHT, 0);
-
     if (!main_window) {
         OSReport("SDL_CreateWindow failed: %s\n", SDL_GetError());
         SDL_Quit();
         return EXIT_FAILURE;
     }
 
+    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
+        OSReport("Failed to initialise SDL_image for PNG files: %s\n", IMG_GetError());
+    }
+
     main_renderer = SDL_CreateRenderer(main_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!main_renderer) {
+        OSReport("SDL_CreateRenderer failed: %s\n", SDL_GetError());
+        return EXIT_FAILURE;
+    }
+
+    mario_texture = load_texture("/vol/external01/smb/assets/mario.png", main_renderer);
+    if (!mario_texture) {
+        OSReport("Failed to load Mario texture\n");
+    }
+    ground_texture = load_texture("/vol/external01/smb/assets/ground.png", main_renderer);
+    if (!ground_texture) {
+        OSReport("Failed to load ground texture\n");
+    }
+
     return EXIT_SUCCESS;
 }
 
 void shutdown() {
+    if (mario_texture) {
+        SDL_DestroyTexture(mario_texture);
+        mario_texture = NULL;
+    }
+    if (ground_texture) {
+        SDL_DestroyTexture(ground_texture);
+        ground_texture = NULL;
+    }
+
+
     SDL_DestroyRenderer(main_renderer);
     SDL_DestroyWindow(main_window);
+    IMG_Quit();
     SDL_Quit();
 }
 
 void input(Input& input) {
     int direction = 0;
     float max_speed = WALK_SPEED;
-    bool jump_pressed = (input.data.buttons_d & Input::BUTTON_B);
+    bool jump_pressed = ((input.data.buttons_d & Input::BUTTON_B) || (input.data.buttons_d & Input::BUTTON_A));
 
     bool right = input.data.buttons_h & Input::STICK_L_RIGHT;
     bool left  = input.data.buttons_h & Input::STICK_L_LEFT;
@@ -145,16 +200,15 @@ void input(Input& input) {
         jump_cut = false;
     }
 
-    // Short jump if button is released early
-    bool jump_held = (input.data.buttons_h & Input::BUTTON_B);
+    // Short jump
+    bool jump_held = ((input.data.buttons_h & Input::BUTTON_B) || (input.data.buttons_h & Input::BUTTON_A));
     if (!jump_held && vertical_speed < 0 && !grounded && !jump_cut) {
-        vertical_speed *= 0.5f; // cut upward speed
+        vertical_speed *= 0.5f;
         jump_cut = true;
     }
 
-    if (mario_y > WINDOW_HEIGHT + 64) {
-        mario_y = 0;
-        vertical_speed = 0;
+    if (mario_y > WINDOW_HEIGHT + MARIO_HEIGHT) {
+        // Handle falling off screen (e.g. reset level or death)
     }
 
     switch (event.type) {
@@ -168,10 +222,15 @@ void update() {
     render_set_color(main_renderer, BACKGROUND_OVERWORLD);
     SDL_RenderClear(main_renderer);
 
-    render_set_color(main_renderer, COLOR_CURSOR);
-    render_rectangle(main_renderer, (int)roundf(mario_x), (int)roundf(mario_y), MARIO_WIDTH, MARIO_HEIGHT, true);
+    render_level(main_renderer, ground_texture);
 
-    render_level(main_renderer);
+    SDL_Rect dst = { (int)roundf(mario_x), (int)roundf(mario_y), MARIO_WIDTH, MARIO_HEIGHT };
+    if (mario_texture) {
+        SDL_RenderCopy(main_renderer, mario_texture, NULL, &dst);
+    } else {
+        render_set_color(main_renderer, COLOR_CURSOR);
+        render_rectangle(main_renderer, dst.x, dst.y, dst.w, dst.h, true);
+    }
 
     SDL_RenderPresent(main_renderer);
 }

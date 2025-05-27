@@ -2,7 +2,7 @@
 
 const int TILE_WIDTH = 16;
 const int TILE_HEIGHT = 16;
-const int MAX_WIDTH = 128;
+const int MAX_WIDTH = 211;
 const int MAX_HEIGHT = 64;
 
 enum TileType {

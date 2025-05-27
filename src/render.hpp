@@ -6,12 +6,17 @@ typedef struct {
     Uint8 r, g, b, a;
 } RenderColor;
 
-extern const RenderColor BACKGROUND_OVERWORLD;
-extern const RenderColor COLOR_CURSOR;
-extern const RenderColor COLOR_WHITE;
-extern const RenderColor COLOR_RED;
-extern const RenderColor COLOR_GREEN;
+// Background Colors
+const SDL_Color BACKGROUND_OVERWORLD = { 92, 148, 252, 255 };
+const SDL_Color COLOR_CURSOR = { 255, 0, 0, 255 };
+const SDL_Color COLOR_WHITE = { 245, 245, 245, 255 };
+const SDL_Color COLOR_RED = { 245, 25, 25, 255 };
+const SDL_Color COLOR_GREEN = { 25, 245, 25, 255 };
 
-void render_set_color(SDL_Renderer *renderer, RenderColor color);
-void render_rectangle(SDL_Renderer *renderer, int x, int y, int w, int h, bool fill);
-void render_level(SDL_Renderer *renderer);
+// Drawing helpers
+void render_set_color(SDL_Renderer* renderer, SDL_Color color);
+void render_rectangle(SDL_Renderer* renderer, int x, int y, int w, int h, bool filled);
+SDL_Texture* load_texture(const char* path, SDL_Renderer* renderer);
+
+// Updated level rendering function
+void render_level(SDL_Renderer* renderer, SDL_Texture* ground_texture);
