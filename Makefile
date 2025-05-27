@@ -30,7 +30,7 @@ include $(DEVKITPRO)/wut/share/wut_rules
 # TV_SPLASH is the image displayed during bootup on the TV, leave blank to use default rule
 # DRC_SPLASH is the image displayed during bootup on the DRC, leave blank to use default rule
 #-------------------------------------------------------------------------------
-TARGET		:=	GameofLife
+TARGET		:=	SuperMarioBros
 BUILD		:=	build
 SOURCES		:=	src src/input
 DATA		:=
@@ -39,6 +39,7 @@ CONTENT		:=
 ICON		:=	media/icon.png
 TV_SPLASH	:=	media/bootDRC.png
 DRC_SPLASH	:=	media/bootDRC.png
+ROMFS 		:=  romfs
 
 #-------------------------------------------------------------------------------
 # options for code generation
@@ -46,14 +47,14 @@ DRC_SPLASH	:=	media/bootDRC.png
 CFLAGS	:=	-Wall -O2 -ffunction-sections \
 			$(MACHDEP)
 
-CFLAGS	+=	$(INCLUDE) -D__WIIU__ -D__WUT__
+CFLAGS	+=	$(INCLUDE) -D__WIIU__ -D__WUT__ -g -O0
 
-CXXFLAGS	:= $(CFLAGS) -std=gnu++20
+CXXFLAGS	:= $(CFLAGS) -std=gnu++20 -g -O0
 
 ASFLAGS	:=	$(ARCH)
 LDFLAGS	=	$(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:=	-lSDL2 -lwut
+LIBS	:=	-lSDL2 -lSDL2_image -lwut
 
 #-------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level

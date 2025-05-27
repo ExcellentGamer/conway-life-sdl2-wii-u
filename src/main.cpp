@@ -10,64 +10,55 @@
 #include "input/VPADInput.h"
 #include "input/WPADInput.h"
 
-#include "game.hpp"
 #include "render.hpp"
 #include "util.hpp"
-
-// Constants
-const int WINDOW_WIDTH = 1920;
-const int WINDOW_HEIGHT = 1080;
-const int UNIT_SIZE = 10;
-const int STEP_INCREMENT = 25;
-const int MIN_SPAWN_BOX_SIZE = 1;
-const int MAX_SPAWN_BOX_SIZE = (WINDOW_HEIGHT / UNIT_SIZE) / 2;
-const int MIN_STEP_LENGTH = 0;
-const int MAX_STEP_LENGTH = 100;
-const int MAX__POINTER_SPEED = 25;
-const int MIN_POINTER_SPEED = 1;
 
 // Global data
 SDL_Window *main_window;
 SDL_Renderer *main_renderer;
 SDL_Event event;
-GameState *game_state;
-Uint64 delay;
-Uint64 ticks;
-int x_pointer = WINDOW_WIDTH / 2;
-int y_pointer = WINDOW_HEIGHT / 2;
-int pointer_speed = 2;
-int population_size;
 
-// Global controls
-bool paused = true;
+// Constants
+const int WINDOW_WIDTH = 1280;
+const int WINDOW_HEIGHT = 720;
+
+const float acceleration = 0.2;
+const int WALK_SPEED = 5;
+const int RUN_SPEED = WALK_SPEED * 2;
+const int GRAVITY = 2;
+const int MARIO_WIDTH = 16;
+const int MARIO_HEIGHT = 16;
+
+// Global Player Variables
+float horizontal_speed = 0.0;
+float vertical_speed = 0.0;
+int mario_x = WINDOW_WIDTH / 2.0;
+int mario_y = WINDOW_HEIGHT / 2.0;
+
+// Global control
 bool quit = false;
-bool fill_cells = true;
-bool color_cells = true;
-int step_length = 0;
-int spawn_box_size = 3;
 
-//
-// Setup everything needed for the game loop
-//
-int initialise()
-{
-    if (SDL_Init(SDL_INIT_VIDEO) < 0)
-    {
+// Global SDL Rects
+SDL_Rect mario_rect = { mario_x, mario_y, 16, 16 };
+SDL_Rect wall_rect = { 300, 350, 100, 32 };  // Example wall/platform
+
+// Setup for The Game Loop
+int initialise() {
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         OSReport("SDL_Init failed with error: ", SDL_GetError(), "\n");
         return EXIT_FAILURE;
     }
 
     // Handle window creation
     main_window = SDL_CreateWindow(
-        "Game of Life SDL2",
+        "Super Mario Bros.",
         SDL_WINDOWPOS_UNDEFINED,
         SDL_WINDOWPOS_UNDEFINED,
         WINDOW_WIDTH,
         WINDOW_HEIGHT,
         0);
 
-    if (main_window == nullptr)
-    {
+    if (main_window == nullptr) {
         OSReport("SDL_CreateWindow failed with error: ", SDL_GetError(), "\n");
         SDL_Quit();
         return EXIT_FAILURE;
@@ -75,219 +66,122 @@ int initialise()
 
     // Handle renderer creation
     main_renderer = SDL_CreateRenderer(main_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    // Handle game state creation
-    game_state = create_game_state(WINDOW_WIDTH, WINDOW_HEIGHT, UNIT_SIZE);
-    population_size = 0;
 
     return EXIT_SUCCESS;
 }
 
-//
-// Called before quitting for cleanup
-//
-void shutdown()
-{
+// Clear out File for Shutdown
+void shutdown() {
     SDL_DestroyWindow(main_window);
     SDL_DestroyRenderer(main_renderer);
     SDL_Quit();
-    destroy_game_state(game_state);
 }
 
-//
-// Called every frame for handling input
-//
-void input(Input &input)
-{
-    // Delete / Create cells
-    if (input.data.buttons_h & Input::BUTTON_A || input.data.buttons_h & Input::BUTTON_B)
-    {
-        int offset = floor(spawn_box_size / 2);
-        int row_selected = x_pointer / UNIT_SIZE;
-        int col_selected = y_pointer / UNIT_SIZE;
-        for (int ii = row_selected; ii < row_selected + spawn_box_size; ii++)
-        {
-            for (int jj = col_selected; jj < col_selected + spawn_box_size; jj++)
-            {
-                int row = ii - offset;
-                int col = jj - offset;
-                if (input.data.buttons_h & Input::BUTTON_A)
-                {
-                    spawn_cell(game_state, row, col, &population_size);
-                }
-                else if (input.data.buttons_h & Input::BUTTON_B)
-                {
-                    kill_cell(game_state, row, col, &population_size);
-                }
-            }
+// Player Physics (Input) Script
+void input(Input &input) {
+    int direction = 0;
+    int max_speed = WALK_SPEED;
+    bool grounded = false;
+
+    bool right = (input.data.buttons_h & Input::STICK_L_RIGHT);
+    bool left  = (input.data.buttons_h & Input::STICK_L_LEFT);
+    bool jump_pressed = (input.data.buttons_d & Input::BUTTON_B);
+
+    if (right && !left) {
+        direction = 1;
+    } else if (!right && left) {
+        direction = -1;
+    }
+
+    // Running modifier
+    if ((input.data.buttons_h & Input::BUTTON_Y) || (input.data.buttons_h & Input::BUTTON_X)) {
+        max_speed = RUN_SPEED;
+    }
+
+    // Horizontal movement
+    if (direction == 1) {
+        horizontal_speed += acceleration;
+        if (horizontal_speed > max_speed) horizontal_speed = max_speed;
+    } else if (direction == -1) {
+        horizontal_speed -= acceleration;
+        if (horizontal_speed < -max_speed) horizontal_speed = -max_speed;
+    } else {
+        // Decelerate to stop
+        if (horizontal_speed > 0) {
+            horizontal_speed -= acceleration;
+            if (horizontal_speed < 0) horizontal_speed = 0;
+        } else if (horizontal_speed < 0) {
+            horizontal_speed += acceleration;
+            if (horizontal_speed > 0) horizontal_speed = 0;
         }
     }
 
-    // Move the pointer
-    if (input.data.buttons_h & Input::STICK_L_UP)
-    {
-        y_pointer -= pointer_speed;
+    // Try moving horizontally
+    SDL_Rect test_rect_x = makeSDLRectFromFloat(mario_x + horizontal_speed, mario_y, MARIO_WIDTH, MARIO_HEIGHT);
+    if (!checkRectCollision(test_rect_x, wall_rect)) {
+        mario_x += horizontal_speed;
+    } else {
+        horizontal_speed = 0;
+    }
 
-        if (y_pointer < (0 - spawn_box_size))
-        {
-            y_pointer = WINDOW_HEIGHT;
+    // Apply gravity
+    vertical_speed += GRAVITY;
+
+    // Try moving vertically
+    SDL_Rect test_rect_y = makeSDLRectFromFloat(mario_x, mario_y + vertical_speed, MARIO_WIDTH, MARIO_HEIGHT);
+    if (!checkRectCollision(test_rect_y, wall_rect)) {
+        mario_y += vertical_speed;
+    } else {
+        if (vertical_speed > 0) {
+            // Landing on top of wall
+            mario_y = wall_rect.y - MARIO_HEIGHT;
+            grounded = true;
+        } else if (vertical_speed < 0) {
+            // Hitting bottom of wall
+            mario_y = wall_rect.y + wall_rect.h;
         }
+        vertical_speed = 0;
     }
 
-    if (input.data.buttons_h & Input::STICK_L_DOWN)
-    {
-        y_pointer += pointer_speed;
-
-        if (y_pointer > (WINDOW_HEIGHT + spawn_box_size))
-        {
-            y_pointer = 0;
-        }
+    // Jumping
+    if (jump_pressed && grounded) {
+        vertical_speed = -30; // jump strength
     }
 
-    if (input.data.buttons_h & Input::STICK_L_LEFT)
-    {
-        x_pointer -= pointer_speed;
-
-        if (x_pointer < (0 - spawn_box_size))
-        {
-            x_pointer = WINDOW_WIDTH;
-        }
+    // Fall off screen reset
+    if (mario_y > WINDOW_HEIGHT + 64) {
+        mario_y = 0;
+        vertical_speed = 0;
     }
 
-    if (input.data.buttons_h & Input::STICK_L_RIGHT)
-    {
-        x_pointer += pointer_speed;
-
-        if (x_pointer > (WINDOW_WIDTH + spawn_box_size))
-        {
-            x_pointer = 0;
-        }
-    }
-
-    // Other inputs
-    if (input.data.buttons_d & Input::BUTTON_X) {
-        spawn_box_size = clamp(spawn_box_size * 2,
-                                            MIN_SPAWN_BOX_SIZE, MAX_SPAWN_BOX_SIZE);
-    } else if (input.data.buttons_d & Input::BUTTON_Y) {
-        spawn_box_size = clamp(spawn_box_size / 2,
-                                            MIN_SPAWN_BOX_SIZE, MAX_SPAWN_BOX_SIZE);
-    }
-
-    if (input.data.buttons_d & Input::BUTTON_PLUS) {
-        paused = !paused;
-        OSReport("PAUSED: ", paused, "\n");
-    }
-
-    if (input.data.buttons_d & Input::BUTTON_R) {
-        fill_cells = !fill_cells;
-        OSReport("FILL: ", fill_cells, "\n");
-    }
-
-    if (input.data.buttons_d & Input::BUTTON_L) {
-        color_cells = !color_cells;
-        OSReport("COLOR: ", color_cells, "\n");
-    }
-
-    if (input.data.buttons_h & Input::BUTTON_ZR) {
-        pointer_speed = clamp(pointer_speed + 1,
-                                            MIN_POINTER_SPEED, MAX__POINTER_SPEED);
-    }
-
-    if (input.data.buttons_h & Input::BUTTON_ZL) {
-        pointer_speed = clamp(pointer_speed - 1,
-                                            MIN_POINTER_SPEED, MAX__POINTER_SPEED);
-    }
-
-    if (input.data.buttons_d & Input::BUTTON_UP) {
-        int updated_step = clamp(step_length + STEP_INCREMENT,
-                                        MIN_STEP_LENGTH, MAX_STEP_LENGTH);
-        if (updated_step != step_length)
-        {
-            step_length = updated_step;
-            OSReport("STEP: ", step_length, "\n");
-        }
-    }
-
-    if (input.data.buttons_d & Input::BUTTON_DOWN) {
-        int updated_step = clamp(step_length - STEP_INCREMENT,
-                                        MIN_STEP_LENGTH, MAX_STEP_LENGTH);
-        if (updated_step != step_length)
-        {
-            step_length = updated_step;
-            OSReport("STEP: ", step_length, "\n");
-        }
-    }
-
-    switch (event.type)
-        {
+    // Quit event
+    switch (event.type) {
         case SDL_QUIT:
             quit = true;
             break;
-
         default:
             break;
-        }
+    }
 }
 
-//
-// Called every frame for processing game state
-//
-void update()
-{
-    ticks = SDL_GetTicks64();
-    bool updating = !paused && ticks >= delay;
-    if (updating)
-    {
-        delay = ticks + step_length;
-    }
-
+// Update Function
+void update() {
     // Background
-    render_set_color(main_renderer, COLOR_GRAY_DARK);
+    render_set_color(main_renderer, BACKGROUND_OVERWORLD);
     SDL_RenderClear(main_renderer);
 
-    // Cells
-    render_set_color(main_renderer, COLOR_WHITE);
-    for (int ii = 0; ii < game_state->CELLS_WIDE; ii++)
-    {
-        for (int jj = 0; jj < game_state->CELLS_HIGH; jj++)
-        {
-            // Render cells
-            if (game_state->front_buffer[ii][jj] >= 1)
-            {
-                if (color_cells)
-                {
-                    int distance_from_mouse = clamp(
-                        find_distance(x_pointer, y_pointer, ii * UNIT_SIZE, jj * UNIT_SIZE), 1, 255);
-                    render_set_color(main_renderer,
-                                     {255 - game_state->front_buffer[ii][jj],
-                                      game_state->front_buffer[ii][jj],
-                                      255 - distance_from_mouse,
-                                      SDL_ALPHA_OPAQUE});
-                }
-                render_rectangle(main_renderer, ii * UNIT_SIZE, jj * UNIT_SIZE,
-                                 UNIT_SIZE, UNIT_SIZE, fill_cells);
-            }
-
-            // Process cells
-            if (updating)
-            {
-                process_cell(game_state, ii, jj, &population_size);
-            }
-        }
-    }
-
-    // Bring the processed cells to the front for rendering on the next call
-    if (updating)
-    {
-        swap_buffers(game_state);
-    }
-
     // Spawn area
-    render_set_color(main_renderer, COLOR_GRAY_LIGHT);
+    render_set_color(main_renderer, COLOR_CURSOR);
     render_rectangle(main_renderer,
-                     ((x_pointer / UNIT_SIZE) * UNIT_SIZE) - ((spawn_box_size) / 2 * UNIT_SIZE),
-                     ((y_pointer / UNIT_SIZE) * UNIT_SIZE) - ((spawn_box_size) / 2 * UNIT_SIZE),
-                     (spawn_box_size)*UNIT_SIZE,
-                     (spawn_box_size)*UNIT_SIZE, false);
+                    mario_x, mario_y, 16, 16, true);
+
+    // Draw wall
+    render_set_color(main_renderer, COLOR_RED);
+    render_rectangle(main_renderer, wall_rect.x, wall_rect.y, wall_rect.w, wall_rect.h, true);
+
+    SDL_Rect mario_rect = makeSDLRectFromFloat(mario_x, mario_y, MARIO_WIDTH, MARIO_HEIGHT);
+    render_set_color(main_renderer, COLOR_CURSOR);
+    render_rectangle(main_renderer, mario_rect.x, mario_rect.y, mario_rect.w, mario_rect.h, true);
 
     // Commit render
     SDL_RenderPresent(main_renderer);
@@ -297,13 +191,9 @@ inline bool RunningFromMiiMaker() {
     return (OSGetTitleID() & 0xFFFFFFFFFFFFF0FFull) == 0x000500101004A000ull;
 }
 
-//
-// Run demo
-//
-int main(int argc, char const *argv[])
-{
-    if (initialise() != EXIT_SUCCESS)
-    {
+// Main Function
+int main(int argc, char const *argv[]) {
+    if (initialise() != EXIT_SUCCESS) {
         shutdown();
     }
 
@@ -324,9 +214,7 @@ int main(int argc, char const *argv[])
             WPAD_CHAN_2,
             WPAD_CHAN_3};
 
-    delay = step_length;
-    while (WHBProcIsRunning())
-    {
+    while (WHBProcIsRunning()) {
         baseInput.reset();
         if (vpadInput.update(1280, 720)) {
             baseInput.combine(vpadInput);
@@ -340,8 +228,7 @@ int main(int argc, char const *argv[])
 
         input(baseInput);
 
-        if (quit)
-        {
+        if (quit) {
            if (RunningFromMiiMaker()) {
                 // Legacy way, just quit
                 break;
@@ -350,7 +237,6 @@ int main(int argc, char const *argv[])
                 SYSLaunchMenu();
             }
         }
-
         update();
     }
 
