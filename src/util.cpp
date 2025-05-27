@@ -2,10 +2,10 @@
 #include "util.hpp"
 
 bool checkRectCollision(const SDL_Rect& a, const SDL_Rect& b) {
-    return a.x + a.w > b.x &&
-           a.x < b.x + b.w &&
-           a.y + a.h > b.y &&
-           a.y < b.y + b.h;
+    return a.x < b.x + b.w && // Collision on the Left of a and the Right of b
+           a.x + a.w > b.x && // Collision on the Right of a and the Left of b
+           a.y < b.y + b.h && // Collision on the Bottom of a and the Top of b
+           a.y + a.h > b.y;   // Collision on the Top of a and the Bottom of b
 }
 
 int signnum(int value) {

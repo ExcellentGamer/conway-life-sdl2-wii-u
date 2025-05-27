@@ -13,92 +13,85 @@
 #include "render.hpp"
 #include "util.hpp"
 #include "level.hpp"
-#include "render.hpp"
-
-// Global data
-SDL_Window *main_window;
-SDL_Renderer *main_renderer;
-SDL_Event event;
 
 // Constants
 const int WINDOW_WIDTH = 256;
 const int WINDOW_HEIGHT = 240;
-
-const float ACCELERATION = 0.1;
-const float GRAVITY = 0.5;
-const float WALK_SPEED = 2.5;
-const int RUN_SPEED = WALK_SPEED * 2;
+const float ACCELERATION = 0.1f;
+const float GRAVITY = 0.5f;
+const float WALK_SPEED = 2.5f;
+const float RUN_SPEED = WALK_SPEED * 2;
 const int MARIO_WIDTH = 16;
 const int MARIO_HEIGHT = 16;
 
-// Global Player Variables
-float horizontal_speed = 0.0;
-float vertical_speed = 0.0;
-int mario_x = WINDOW_WIDTH / 2.0;
-int mario_y = WINDOW_HEIGHT / 2.0;
+// Global Variables
+SDL_Window* main_window;
+SDL_Renderer* main_renderer;
+SDL_Event event;
 
-// Global control
+float horizontal_speed = 0.0f;
+float vertical_speed = 0.0f;
+float mario_x = WINDOW_WIDTH / 2.0f;
+float mario_y = WINDOW_HEIGHT / 2.0f;
 bool quit = false;
+bool grounded = false;
+bool jump_cut = false;
 
-// Global SDL Rects
-SDL_Rect mario_rect = { mario_x, mario_y, 16, 16 };
-SDL_Rect wall_rect = { 300, 350, 100, 32 };  // Example wall/platform
+SDL_Rect mario_rect = { (int)mario_x, (int)mario_y, MARIO_WIDTH, MARIO_HEIGHT };
 
-// Setup for The Game Loop
+// Helpers
+bool is_solid_box(float x, float y, int w, int h) {
+    const int step = 4;
+
+    for (int dy = 0; dy <= h; dy += step) {
+        for (int dx = 0; dx <= w; dx += step) {
+            float sample_x = x + ((dx >= w) ? (w - 1) : dx);
+            float sample_y = y + ((dy >= h) ? (h - 1) : dy);
+            if (is_solid_at(sample_x, sample_y)) return true;
+        }
+    }
+    return false;
+}
+
 int initialise() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        OSReport("SDL_Init failed with error: ", SDL_GetError(), "\n");
+        OSReport("SDL_Init failed: %s\n", SDL_GetError());
         return EXIT_FAILURE;
     }
 
-    // Handle window creation
-    main_window = SDL_CreateWindow(
-        "Super Mario Bros.",
-        SDL_WINDOWPOS_UNDEFINED,
-        SDL_WINDOWPOS_UNDEFINED,
-        WINDOW_WIDTH,
-        WINDOW_HEIGHT,
-        0);
+    main_window = SDL_CreateWindow("Super Mario Bros.",
+                                   SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+                                   WINDOW_WIDTH, WINDOW_HEIGHT, 0);
 
-    if (main_window == nullptr) {
-        OSReport("SDL_CreateWindow failed with error: ", SDL_GetError(), "\n");
+    if (!main_window) {
+        OSReport("SDL_CreateWindow failed: %s\n", SDL_GetError());
         SDL_Quit();
         return EXIT_FAILURE;
     }
 
-    // Handle renderer creation
     main_renderer = SDL_CreateRenderer(main_window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-
     return EXIT_SUCCESS;
 }
 
-// Clear out File for Shutdown
 void shutdown() {
-    SDL_DestroyWindow(main_window);
     SDL_DestroyRenderer(main_renderer);
+    SDL_DestroyWindow(main_window);
     SDL_Quit();
 }
 
-// Player Physics (Input) Script
-void input(Input &input) {
+void input(Input& input) {
     int direction = 0;
-    int max_speed = WALK_SPEED;
-    bool grounded = false;
-
-    bool right = (input.data.buttons_h & Input::STICK_L_RIGHT);
-    bool left  = (input.data.buttons_h & Input::STICK_L_LEFT);
+    float max_speed = WALK_SPEED;
     bool jump_pressed = (input.data.buttons_d & Input::BUTTON_B);
 
-    if (right && !left) {
-        direction = 1;
-    } else if (!right && left) {
-        direction = -1;
-    }
+    bool right = input.data.buttons_h & Input::STICK_L_RIGHT;
+    bool left  = input.data.buttons_h & Input::STICK_L_LEFT;
 
-    // Running modifier
-    if ((input.data.buttons_h & Input::BUTTON_Y) || (input.data.buttons_h & Input::BUTTON_X)) {
+    if (right && !left) direction = 1;
+    else if (!right && left) direction = -1;
+
+    if ((input.data.buttons_h & Input::BUTTON_Y) || (input.data.buttons_h & Input::BUTTON_X))
         max_speed = RUN_SPEED;
-    }
 
     // Horizontal movement
     if (direction == 1) {
@@ -108,7 +101,6 @@ void input(Input &input) {
         horizontal_speed -= ACCELERATION;
         if (horizontal_speed < -max_speed) horizontal_speed = -max_speed;
     } else {
-        // Decelerate to stop
         if (horizontal_speed > 0) {
             horizontal_speed -= ACCELERATION;
             if (horizontal_speed < 0) horizontal_speed = 0;
@@ -118,70 +110,69 @@ void input(Input &input) {
         }
     }
 
-    // Try moving horizontally
-    SDL_Rect test_rect_x = makeSDLRectFromFloat(mario_x + horizontal_speed, mario_y, MARIO_WIDTH, MARIO_HEIGHT);
-    if (!is_solid_at(mario_x + horizontal_speed, mario_y + MARIO_HEIGHT / 2)) {
-        mario_x += horizontal_speed;
+    // Horizontal collision
+    float new_x = mario_x + horizontal_speed;
+    if (!is_solid_box(new_x, mario_y, MARIO_WIDTH, MARIO_HEIGHT)) {
+        mario_x = new_x;
     } else {
+        while (!is_solid_box(mario_x + (horizontal_speed > 0 ? 1 : -1), mario_y, MARIO_WIDTH, MARIO_HEIGHT)) {
+            mario_x += (horizontal_speed > 0 ? 1 : -1);
+        }
         horizontal_speed = 0;
     }
 
     // Apply gravity
     vertical_speed += GRAVITY;
+    float new_y = mario_y + vertical_speed;
 
-    if (!is_solid_at(mario_x + MARIO_WIDTH / 2, mario_y + vertical_speed + MARIO_HEIGHT)) {
-        mario_y += vertical_speed;
+    if (!is_solid_box(mario_x, new_y, MARIO_WIDTH, MARIO_HEIGHT)) {
+        mario_y = new_y;
         grounded = false;
     } else {
-        if (vertical_speed > 0) {
-            mario_y = ((int)(mario_y + vertical_speed + MARIO_HEIGHT) / TILE_HEIGHT) * TILE_HEIGHT - MARIO_HEIGHT;
-            grounded = true;
-        } else if (vertical_speed < 0) {
-            mario_y = ((int)(mario_y + vertical_speed) / TILE_HEIGHT + 1) * TILE_HEIGHT;
+        while (!is_solid_box(mario_x, mario_y + (vertical_speed > 0 ? 1 : -1), MARIO_WIDTH, MARIO_HEIGHT)) {
+            mario_y += (vertical_speed > 0 ? 1 : -1);
         }
+
+        if (vertical_speed > 0) grounded = true;
+        if (grounded) jump_cut = false;
         vertical_speed = 0;
     }
 
-    // Jumping
+    // Start jump
     if (jump_pressed && grounded) {
-        vertical_speed = -8; // jump strength
+        vertical_speed = -8.5f;
+        grounded = false;
+        jump_cut = false;
     }
 
-    // Fall off screen reset
+    // Short jump if button is released early
+    bool jump_held = (input.data.buttons_h & Input::BUTTON_B);
+    if (!jump_held && vertical_speed < 0 && !grounded && !jump_cut) {
+        vertical_speed *= 0.5f; // cut upward speed
+        jump_cut = true;
+    }
+
     if (mario_y > WINDOW_HEIGHT + 64) {
         mario_y = 0;
         vertical_speed = 0;
     }
 
-    // Quit event
     switch (event.type) {
         case SDL_QUIT:
             quit = true;
             break;
-        default:
-            break;
     }
 }
 
-// Update Function
 void update() {
-    // Background
     render_set_color(main_renderer, BACKGROUND_OVERWORLD);
     SDL_RenderClear(main_renderer);
 
-    // Spawn area
     render_set_color(main_renderer, COLOR_CURSOR);
-    render_rectangle(main_renderer,
-                    mario_x, mario_y, 16, 16, true);
+    render_rectangle(main_renderer, (int)roundf(mario_x), (int)roundf(mario_y), MARIO_WIDTH, MARIO_HEIGHT, true);
 
-    // Draw Level
     render_level(main_renderer);
 
-    SDL_Rect mario_rect = makeSDLRectFromFloat(mario_x, mario_y, MARIO_WIDTH, MARIO_HEIGHT);
-    render_set_color(main_renderer, COLOR_CURSOR);
-    render_rectangle(main_renderer, mario_rect.x, mario_rect.y, mario_rect.w, mario_rect.h, true);
-
-    // Commit render
     SDL_RenderPresent(main_renderer);
 }
 
@@ -189,16 +180,15 @@ inline bool RunningFromMiiMaker() {
     return (OSGetTitleID() & 0xFFFFFFFFFFFFF0FFull) == 0x000500101004A000ull;
 }
 
-// Main Function
-int main(int argc, char const *argv[]) {
+int main(int argc, char const* argv[]) {
     if (initialise() != EXIT_SUCCESS) {
         shutdown();
+        return EXIT_FAILURE;
     }
 
     WHBProcInit();
     loadLevel("/vol/external01/smb/levels/level1.txt");
 
-    // Call AXInit to stop already playing sounds
     AXInit();
     AXQuit();
 
@@ -208,39 +198,29 @@ int main(int argc, char const *argv[]) {
     CombinedInput baseInput;
     VPadInput vpadInput;
     WPADInput wpadInputs[4] = {
-            WPAD_CHAN_0,
-            WPAD_CHAN_1,
-            WPAD_CHAN_2,
-            WPAD_CHAN_3};
+        WPAD_CHAN_0, WPAD_CHAN_1, WPAD_CHAN_2, WPAD_CHAN_3
+    };
 
     while (WHBProcIsRunning()) {
         baseInput.reset();
-        if (vpadInput.update(1280, 720)) {
-            baseInput.combine(vpadInput);
-        }
-        for (auto &wpadInput : wpadInputs) {
-            if (wpadInput.update(1280, 720)) {
-                baseInput.combine(wpadInput);
-            }
+        if (vpadInput.update(1280, 720)) baseInput.combine(vpadInput);
+        for (auto& wpadInput : wpadInputs) {
+            if (wpadInput.update(1280, 720)) baseInput.combine(wpadInput);
         }
         baseInput.process();
 
+        while (SDL_PollEvent(&event)) {}
         input(baseInput);
 
         if (quit) {
-           if (RunningFromMiiMaker()) {
-                // Legacy way, just quit
-                break;
-            } else {
-                // Launch menu otherwise
-                SYSLaunchMenu();
-            }
+            if (RunningFromMiiMaker()) break;
+            else SYSLaunchMenu();
         }
+
         update();
     }
 
     shutdown();
-
     WHBProcShutdown();
     return EXIT_SUCCESS;
 }
