@@ -1,8 +1,8 @@
 #pragma once
 #include <string>
 
-const int TILE_WIDTH = 16*3;
-const int TILE_HEIGHT = 16*3;
+const int TILE_WIDTH = 48;
+const int TILE_HEIGHT = 48;
 const int MAX_WIDTH = 256*3;
 const int MAX_HEIGHT = 15*3;
 

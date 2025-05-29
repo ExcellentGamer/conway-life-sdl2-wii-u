@@ -1,8 +1,10 @@
-#include "level.hpp"
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <sstream>
 #include <map>
+
+#include "level.hpp"
 
 extern float mario_x;
 extern float mario_y;
@@ -23,26 +25,29 @@ bool loadLevel(const char* filename) {
 
     while (std::getline(file, line)) {
         if (line.rfind("#tileset", 0) == 0) {
-            // This is the tileset declaration
-            current_tileset = line.substr(9); // Skip "#tileset "
+            current_tileset = line.substr(9);
             continue;
         }
 
         if (y >= MAX_HEIGHT) break;
 
-        for (size_t x = 0; x < line.length() && x < MAX_WIDTH; ++x) {
-            char tile = line[x];
+        std::istringstream iss(line);
+        std::string token;
+        int x = 0;
 
-            if (tile == 'm' && !marioSpawnSet) {
+        while (iss >> token && x < MAX_WIDTH) {
+            if (token == "mm" && !marioSpawnSet) {
                 mario_x = x * TILE_WIDTH;
                 mario_y = y * TILE_HEIGHT;
                 marioSpawnSet = true;
                 level[y][x] = 0;
-            } else if (tile >= '0' && tile <= '9') {
-                level[y][x] = tile - '0';
             } else {
-                level[y][x] = 0;
+                int value;
+                std::istringstream hexstream(token);
+                hexstream >> std::hex >> value;
+                level[y][x] = value;
             }
+            ++x;
         }
 
         ++y;
@@ -61,5 +66,5 @@ bool is_solid_at(float x, float y) {
     }
 
     int tile_id = level[tile_y][tile_x];
-    return tile_id == 1; // Treat tile index 1 as solid (you can expand this)
+    return tile_id >= 1 && tile_id <= 29;
 }
