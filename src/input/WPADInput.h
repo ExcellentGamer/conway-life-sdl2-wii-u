@@ -152,12 +152,6 @@ public:
         if (data.validPointer) {
             data.x = (width >> 1) * kpad.pos.x;
             data.y = (height >> 1) * (-kpad.pos.y);
-
-            if (kpad.angle.y > 0.0f) {
-                data.pointerAngle = (-kpad.angle.x + 1.0f) * 0.5f * 180.0f;
-            } else {
-                data.pointerAngle = (kpad.angle.x + 1.0f) * 0.5f * 180.0f - 180.0f;
-            }
         }
 
         return true;

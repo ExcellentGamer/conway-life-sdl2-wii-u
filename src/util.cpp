@@ -25,6 +25,6 @@ double clamp(double d, double min, double max) {
   return t > max ? max : t;
 }
 
-SDL_Rect makeSDLRectFromFloat(float x, float y, int w, int h) {
+SDL_Rect makeSDLRectfromFloat(float x, float y, int w, int h) {
     return SDL_Rect{ (int)x, (int)y, w, h };
 }

@@ -19,18 +19,25 @@ void render_rectangle(SDL_Renderer* renderer, int x, int y, int w, int h, bool f
 }
 
 // Render level with ground tiles
-void render_level(SDL_Renderer* renderer, SDL_Texture* ground_texture) {
+void render_level(SDL_Renderer* renderer, SDL_Texture* tileset) {
+    SDL_Rect src, dst;
+    const int tiles_per_row = 8; // depends on your tileset.png layout
+
+    src.w = dst.w = TILE_WIDTH;
+    src.h = dst.h = TILE_HEIGHT;
+
     for (int y = 0; y < MAX_HEIGHT; ++y) {
         for (int x = 0; x < MAX_WIDTH; ++x) {
-            if (level[y][x] == TILE_SOLID && ground_texture) {
-                SDL_Rect dest = {
-                    x * TILE_WIDTH,
-                    y * TILE_HEIGHT,
-                    TILE_WIDTH,
-                    TILE_HEIGHT
-                };
-                SDL_RenderCopy(renderer, ground_texture, NULL, &dest);
-            }
+            int tile_id = level[y][x];
+            if (tile_id == 0) continue; // Skip empty/air
+
+            dst.x = x * TILE_WIDTH;
+            dst.y = y * TILE_HEIGHT;
+
+            src.x = (tile_id % tiles_per_row) * TILE_WIDTH;
+            src.y = (tile_id / tiles_per_row) * TILE_HEIGHT;
+
+            SDL_RenderCopy(renderer, tileset, &src, &dst);
         }
     }
 }

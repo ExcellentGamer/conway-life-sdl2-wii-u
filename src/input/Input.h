@@ -50,7 +50,6 @@ public:
         uint32_t buttons_r;
         bool validPointer;
         bool touched;
-        float pointerAngle;
         int32_t x;
         int32_t y;
     } PadData;

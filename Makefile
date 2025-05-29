@@ -13,9 +13,9 @@ TOPDIR ?= $(CURDIR)
 # APP_SHORTNAME sets the short name of the application
 # APP_AUTHOR sets the author of the application
 #-------------------------------------------------------------------------------
-APP_NAME		:= Game of Life
-APP_SHORTNAME	:= Game of Life
-APP_AUTHOR		:= MathewDiMarco, Benchaton
+APP_NAME		:= Super Mario Bros.
+APP_SHORTNAME	:= Super Mario Bros.
+APP_AUTHOR		:= ExcellentGamer
 
 include $(DEVKITPRO)/wut/share/wut_rules
 
