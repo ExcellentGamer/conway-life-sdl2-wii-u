@@ -1,11 +1,12 @@
+#include <SDL.h>
+#include <SDL_ttf.h>
+#include <SDL_image.h>
 #include <coreinit/debug.h>
 #include <coreinit/title.h>
 #include <padscore/kpad.h>
 #include <sndcore2/core.h>
 #include <sysapp/launch.h>
 #include <whb/proc.h>
-#include <SDL.h>
-#include <SDL_image.h>
 
 #include "input/CombinedInput.h"
 #include "input/VPADInput.h"
@@ -15,10 +16,7 @@
 #include "render.hpp"
 #include "util.hpp"
 #include "level.hpp"
-
-// Constants
-const int WINDOW_WIDTH = 1280;
-const int WINDOW_HEIGHT = 720;
+#include "config.hpp"
 
 const int MARIO_WIDTH = 44;
 const int MARIO_HEIGHT = 48;
@@ -33,9 +31,11 @@ float horizontal_speed = 0;
 float vertical_speed = 0;
 float mario_x = WINDOW_WIDTH / 2;
 float mario_y = WINDOW_HEIGHT / 2;
+float camera_x = 0;
 
 // Global Booleans
 bool quit = false;
+bool paused = false;
 bool grounded = false;
 bool jump_cut = false;
 bool mario_facing_right = true;
@@ -43,6 +43,7 @@ bool mario_facing_right = true;
 SDL_Window* main_window;
 SDL_Renderer* main_renderer;
 SDL_Event event;
+TTF_Font* game_font = nullptr;
 
 // Textures
 SDL_Texture* mario_texture = NULL;
@@ -99,6 +100,11 @@ int initialise() {
         return EXIT_FAILURE;
     }
 
+    if (TTF_Init() == -1) {
+        OSReport("TTF_Init failed: %s\n", TTF_GetError());
+        return EXIT_FAILURE;
+    }
+
     main_window = SDL_CreateWindow("Super Mario Bros.",
                                    SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                    WINDOW_WIDTH, WINDOW_HEIGHT, 0);
@@ -126,6 +132,10 @@ int initialise() {
     if (!tileset_texture) {
         OSReport("Failed to load ground texture\n");
     }
+    game_font = TTF_OpenFont("/vol/external01/smb/assets/fonts/smb.ttf", 32);
+    if (!game_font) {
+        OSReport("Failed to load font: %s\n", TTF_GetError());
+    }
 
     return EXIT_SUCCESS;
 }
@@ -139,12 +149,16 @@ void shutdown() {
         SDL_DestroyTexture(tileset_texture);
         tileset_texture = NULL;
     }
-
+    if (game_font) {
+        TTF_CloseFont(game_font);
+        game_font = nullptr;
+    }
 
     SDL_DestroyRenderer(main_renderer);
     SDL_DestroyWindow(main_window);
     IMG_Quit();
     SDL_Quit();
+    TTF_Quit();
 }
 
 void input(Input& input) {
@@ -156,93 +170,100 @@ void input(Input& input) {
     bool left  = input.data.buttons_h & Input::STICK_L_LEFT;
     bool down  = input.data.buttons_h & Input::STICK_L_DOWN;
 
+    if (input.data.buttons_d & Input::BUTTON_PLUS) {
+        paused = !paused;
+        return;
+    }
+
     // If grounded and down is held, cancel horizontal input
-    if (!(grounded && down)) {
-        if (right && !left) direction = 1;
-        else if (!right && left) direction = -1;
-    }
+    if (!paused) {
+        if (!(grounded && down)) {
+            if (right && !left) direction = 1;
+            else if (!right && left) direction = -1;
+        }
 
-    if ((input.data.buttons_h & Input::BUTTON_Y) || (input.data.buttons_h & Input::BUTTON_X))
-        max_speed = RUN_SPEED;
+        if ((input.data.buttons_h & Input::BUTTON_Y) || (input.data.buttons_h & Input::BUTTON_X))
+            max_speed = RUN_SPEED;
 
-    // Animations
-    if (input.data.buttons_h & Input::STICK_L_DOWN) {
-        animationPlayer.play(&crouchAnim);
-    } else if (grounded) {
-        if (horizontal_speed != 0) {
-            animationPlayer.play(&runAnim);
+        // Animations
+        if (input.data.buttons_h & Input::STICK_L_DOWN) {
+            animationPlayer.play(&crouchAnim);
+        } else if (grounded) {
+            if (horizontal_speed != 0) {
+                animationPlayer.play(&runAnim);
+            } else {
+                animationPlayer.play(&idleAnim);
+            }
         } else {
-            animationPlayer.play(&idleAnim);
+            animationPlayer.play(&jumpAnim);
         }
-    } else {
-        animationPlayer.play(&jumpAnim);
-    }
 
-    if (horizontal_speed > 0) mario_facing_right = true;
-    else if (horizontal_speed < 0) mario_facing_right = false;
+        if (horizontal_speed > 0) mario_facing_right = true;
+        else if (horizontal_speed < 0) mario_facing_right = false;
 
 
-    // Horizontal movement
-    if (direction == 1) {
-        horizontal_speed += ACCELERATION;
-        if (horizontal_speed > max_speed) horizontal_speed = max_speed;
-    } else if (direction == -1) {
-        horizontal_speed -= ACCELERATION;
-        if (horizontal_speed < -max_speed) horizontal_speed = -max_speed;
-    } else {
-        if (horizontal_speed > 0) {
-            horizontal_speed -= ACCELERATION;
-            if (horizontal_speed < 0) horizontal_speed = 0;
-        } else if (horizontal_speed < 0) {
+        // Horizontal movement
+        if (direction == 1) {
             horizontal_speed += ACCELERATION;
-            if (horizontal_speed > 0) horizontal_speed = 0;
-        }
-    }
-
-    // Horizontal collision
-    int new_x = mario_x + horizontal_speed;
-    if (!is_solid_box(new_x, mario_y, MARIO_WIDTH, MARIO_HEIGHT)) {
-        mario_x = new_x;
-    } else {
-        while (!is_solid_box(mario_x + (horizontal_speed > 0 ? 1 : -1), mario_y, MARIO_WIDTH, MARIO_HEIGHT)) {
-            mario_x += (horizontal_speed > 0 ? 1 : -1);
-        }
-        horizontal_speed = 0;
-    }
-
-    // Apply gravity
-    vertical_speed += GRAVITY;
-    int new_y = mario_y + vertical_speed;
-
-    if (!is_solid_box(mario_x, new_y, MARIO_WIDTH, MARIO_HEIGHT)) {
-        mario_y = new_y;
-        grounded = false;
-    } else {
-        while (!is_solid_box(mario_x, mario_y + (vertical_speed > 0 ? 1 : -1), MARIO_WIDTH, MARIO_HEIGHT)) {
-            mario_y += (vertical_speed > 0 ? 1 : -1);
+            if (horizontal_speed > max_speed) horizontal_speed = max_speed;
+        } else if (direction == -1) {
+            horizontal_speed -= ACCELERATION;
+            if (horizontal_speed < -max_speed) horizontal_speed = -max_speed;
+        } else {
+            if (horizontal_speed > 0) {
+                horizontal_speed -= ACCELERATION;
+                if (horizontal_speed < 0) horizontal_speed = 0;
+            } else if (horizontal_speed < 0) {
+                horizontal_speed += ACCELERATION;
+                if (horizontal_speed > 0) horizontal_speed = 0;
+            }
         }
 
-        if (vertical_speed > 0) grounded = true;
-        if (grounded) jump_cut = false;
-        vertical_speed = 0;
-    }
+        // Horizontal collision
+        int new_x = mario_x + horizontal_speed;
+        if (!is_solid_box(new_x, mario_y, MARIO_WIDTH, MARIO_HEIGHT)) {
+            mario_x = new_x;
+        } else {
+            while (!is_solid_box(mario_x + (horizontal_speed > 0 ? 1 : -1), mario_y, MARIO_WIDTH, MARIO_HEIGHT)) {
+                mario_x += (horizontal_speed > 0 ? 1 : -1);
+            }
+            horizontal_speed = 0;
+        }
 
-    // Start jump
-    if (jump_pressed && grounded) {
-        vertical_speed = -21;
-        grounded = false;
-        jump_cut = false;
-    }
+        // Apply gravity
+        vertical_speed += GRAVITY;
+        int new_y = mario_y + vertical_speed;
 
-    // Short jump
-    bool jump_held = ((input.data.buttons_h & Input::BUTTON_B) || (input.data.buttons_h & Input::BUTTON_A));
-    if (!jump_held && vertical_speed < 0 && !grounded && !jump_cut) {
-        vertical_speed *= 0.5f;
-        jump_cut = true;
-    }
+        if (!is_solid_box(mario_x, new_y, MARIO_WIDTH, MARIO_HEIGHT)) {
+            mario_y = new_y;
+            grounded = false;
+        } else {
+            while (!is_solid_box(mario_x, mario_y + (vertical_speed > 0 ? 1 : -1), MARIO_WIDTH, MARIO_HEIGHT)) {
+                mario_y += (vertical_speed > 0 ? 1 : -1);
+            }
 
-    if (mario_y > WINDOW_HEIGHT + MARIO_HEIGHT) {
-        // Handle falling off screen (e.g. reset level or death)
+            if (vertical_speed > 0) grounded = true;
+            if (grounded) jump_cut = false;
+            vertical_speed = 0;
+        }
+
+        // Start jump
+        if (jump_pressed && grounded) {
+            vertical_speed = -21;
+            grounded = false;
+            jump_cut = false;
+        }
+
+        // Short jump
+        bool jump_held = ((input.data.buttons_h & Input::BUTTON_B) || (input.data.buttons_h & Input::BUTTON_A));
+        if (!jump_held && vertical_speed < 0 && !grounded && !jump_cut) {
+            vertical_speed *= 0.5f;
+            jump_cut = true;
+        }
+
+        if (mario_y > WINDOW_HEIGHT + MARIO_HEIGHT) {
+            // Handle falling off screen (e.g. reset level or death)
+        }
     }
 
     switch (event.type) {
@@ -261,15 +282,32 @@ void update() {
     render_set_color(main_renderer, BACKGROUND_OVERWORLD);
     SDL_RenderClear(main_renderer);
 
-    render_level(main_renderer, tileset_texture);
+    render_level(main_renderer, tileset_texture, camera_x);
 
-    SDL_Rect dst = { (int)roundf(mario_x), (int)roundf(mario_y), 48, 48 };
+    SDL_Rect dst = { (int)roundf(mario_x - camera_x), (int)roundf(mario_y), 48, 48 };
     SDL_Rect src = animationPlayer.currentFrame();
     SDL_RendererFlip flip = mario_facing_right ? SDL_FLIP_NONE : SDL_FLIP_HORIZONTAL;
     SDL_RenderCopyEx(main_renderer, mario_texture, &src, &dst, 0.0, NULL, flip);
 
+    // Center the camera on Mario (X axis only)
+    camera_x = mario_x - WINDOW_WIDTH / 2;
+
+    // You can clamp to the max level width too, e.g.
+    // if (camera_x > LEVEL_WIDTH_PIXELS - WINDOW_WIDTH) camera_x = LEVEL_WIDTH_PIXELS - WINDOW_WIDTH;
+    if (camera_x < 0) camera_x = 0;
+
     int delta = getDeltaTime();
-    animationPlayer.update(delta, speedMultiplier);
+    animationPlayer.update(delta, paused ? 0.0f : speedMultiplier);
+
+    if (paused) {
+        SDL_SetRenderDrawBlendMode(main_renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(main_renderer, 0, 0, 0, 128);
+        SDL_Rect overlay = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
+        SDL_RenderFillRect(main_renderer, &overlay);
+
+        SDL_Color white = {255, 255, 255, 255};
+        render_text(main_renderer, game_font, "Paused", WINDOW_WIDTH / 2 - 50, WINDOW_HEIGHT / 2 - 16, white);
+    }
 
     SDL_RenderPresent(main_renderer);
 }

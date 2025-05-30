@@ -19,4 +19,4 @@ void render_rectangle(SDL_Renderer* renderer, int x, int y, int w, int h, bool f
 SDL_Texture* load_texture(const char* path, SDL_Renderer* renderer);
 
 // Updated level rendering function
-void render_level(SDL_Renderer* renderer, SDL_Texture* tileset);
+void render_level(SDL_Renderer* renderer, SDL_Texture* tileset, float camera_x);
