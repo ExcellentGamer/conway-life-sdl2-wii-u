@@ -12,6 +12,8 @@
 
 extern float mario_x;
 extern float mario_y;
+extern float mario_spawn_x;
+extern float mario_spawn_y;
 extern SDL_Color backgroundColor;
 
 int level[MAX_HEIGHT][MAX_WIDTH];
@@ -72,11 +74,23 @@ bool loadLevel(const std::string& filename) {
         int x = 0;
 
         while (iss >> token && x < MAX_WIDTH) {
-            if (token == "mm" && !marioSpawnSet) {
-                mario_x = x * TILE_WIDTH;
-                mario_y = y * TILE_HEIGHT;
-                marioSpawnSet = true;
-                level[y][x] = 0;
+            if (token == "mm" || (token.length() > 1 && token.back() == 'M')) {
+                std::string numPart = token.substr(0, token.length() - 1);
+                int value = 0;
+
+                if (numPart.find_first_not_of("0123456789") == std::string::npos) {
+                    std::istringstream(numPart) >> value; // Decimal
+                } else {
+                    std::istringstream(numPart) >> std::hex >> value; // Hex
+                }
+
+                level[y][x] = value;
+
+                if (!marioSpawnSet) {
+                    marioSpawnSet = true;
+                    mario_x = mario_spawn_x = x * TILE_WIDTH;
+                    mario_y = mario_spawn_y = y * TILE_HEIGHT;
+                }
             } else {
                 int value = 0;
                 std::istringstream parser(token);
@@ -102,6 +116,19 @@ bool loadLevel(const std::string& filename) {
     return true;
 }
 
+void unloadLevel() {
+    // Clear all tile IDs in the level grid
+    for (int y = 0; y < MAX_HEIGHT; ++y) {
+        for (int x = 0; x < MAX_WIDTH; ++x) {
+            level[y][x] = 0;
+        }
+    }
+
+    // Reset level width
+    level_width_tiles = 0;
+}
+
+
 bool is_solid_at(float x, float y) {
     // Hard wall at screen left edge (x = 0)
     if (x < 0.0f) {
@@ -116,5 +143,11 @@ bool is_solid_at(float x, float y) {
     }
 
     int tile_id = level[tile_y][tile_x];
+    if (current_tileset != "overworld") {
+        if (tile_id == 38) {
+            return true;
+        }
+    }
+
     return tile_id >= 1 && tile_id <= 29;
 }

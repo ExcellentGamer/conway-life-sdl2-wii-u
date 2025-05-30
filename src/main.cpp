@@ -28,10 +28,13 @@ const int RUN_SPEED = WALK_SPEED * 2;
 const float ACCELERATION = 0.3f;
 
 // Global Variables
+int currentLevelIndex = 0;
 float horizontal_speed = 0;
 float vertical_speed = 0;
 float mario_x = WINDOW_WIDTH / 2;
 float mario_y = WINDOW_HEIGHT / 2;
+float mario_spawn_x;
+float mario_spawn_y;
 float camera_x = 0;
 
 // Global Booleans
@@ -97,6 +100,17 @@ int getDeltaTime() {
     return delta;
 }
 
+std::vector<std::string> levelList = {
+    "1-1", "1-1_1", "1-2", "1-2_1", "1-2_2", "1-3", "1-4",
+    "2-1", "2-2", "2-3", "2-4",
+    "3-1", "3-2", "3-3", "3-4",
+    "4-1", "4-2", "4-3", "4-4",
+    "5-1", "5-2", "5-3", "54",
+    "6-1", "6-2", "6-3", "6-4",
+    "7-1", "7-2", "7-3", "7-4",
+    "8-1", "8-2", "8-3", "8-4",
+};
+
 int initialise() {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         OSReport("SDL_Init failed: %s\n", SDL_GetError());
@@ -155,6 +169,24 @@ void input(Input& input) {
     if (input.data.buttons_d & Input::BUTTON_PLUS) {
         paused = !paused;
         return;
+    }
+
+    if (input.data.buttons_d & Input::BUTTON_MINUS) {
+        currentLevelIndex = (currentLevelIndex + 1) % levelList.size();
+        std::string nextLevelPath = "/vol/external01/smb/levels/" + levelList[currentLevelIndex] + ".txt";
+
+        unloadLevel();
+
+        mario_x = mario_spawn_x = 0;
+        mario_y = mario_spawn_y = 0;
+        camera_x = 0;
+        horizontal_speed = 0;
+        vertical_speed = 0;
+        grounded = false;
+        jump_cut = false;
+        paused = false;
+
+        loadLevel(nextLevelPath);
     }
 
     // If grounded and down is held, cancel horizontal input
@@ -283,11 +315,22 @@ void update() {
     // if (camera_x > LEVEL_WIDTH_PIXELS - WINDOW_WIDTH) camera_x = LEVEL_WIDTH_PIXELS - WINDOW_WIDTH;
     if (camera_x < 0) camera_x = 0;
 
+    std::string displayName = levelList[currentLevelIndex];
+    size_t underscorePos = displayName.find('_');
+    if (underscorePos != std::string::npos) {
+        displayName = displayName.substr(0, underscorePos);
+    }
+
     int delta = getDeltaTime();
     animationPlayer.update(delta, paused ? 0.0f : speedMultiplier);
 
     font.renderText(main_renderer, "MARIO", 50, 25, TextAlign::LEFT, -4);
     font.renderText(main_renderer, "000000", 50, 50, TextAlign::LEFT, -4); // Replace with a score that can actually be updated
+    font.renderText(main_renderer, "00", ((WINDOW_WIDTH / 2) - 200), 50, TextAlign::LEFT, -4); // Replace with a coin count that can actually be updated
+    font.renderText(main_renderer, "WORLD", ((WINDOW_WIDTH / 2) + 200), 25, TextAlign::LEFT, -4);
+    font.renderText(main_renderer, displayName.c_str(), ((WINDOW_WIDTH / 2) + 265), 50, TextAlign::CENTER, -4);
+    font.renderText(main_renderer, "TIME", 1230, 25, TextAlign::RIGHT, -4);
+    font.renderText(main_renderer, "400", 1190, 50, TextAlign::CENTER, -4);
 
     if (paused) {
         SDL_SetRenderDrawBlendMode(main_renderer, SDL_BLENDMODE_BLEND);
@@ -313,7 +356,7 @@ int main(int argc, char const* argv[]) {
 
     WHBProcInit();
     load_tilesets(main_renderer);
-    loadLevel("/vol/external01/smb/levels/level1.txt");
+    loadLevel("/vol/external01/smb/levels/1-1.txt");
 
     AXInit();
     AXQuit();

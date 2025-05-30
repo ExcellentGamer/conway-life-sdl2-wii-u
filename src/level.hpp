@@ -11,4 +11,5 @@ extern std::string current_tileset;
 
 int get_level_width_tiles();
 bool loadLevel(const std::string& filename);
+void unloadLevel();
 bool is_solid_at(float x, float y);
