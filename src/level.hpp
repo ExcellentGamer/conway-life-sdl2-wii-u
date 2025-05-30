@@ -9,5 +9,6 @@ const int MAX_HEIGHT = 15*3;
 extern int level[MAX_HEIGHT][MAX_WIDTH];
 extern std::string current_tileset;
 
+int get_level_width_tiles();
 bool loadLevel(const std::string& filename);
 bool is_solid_at(float x, float y);

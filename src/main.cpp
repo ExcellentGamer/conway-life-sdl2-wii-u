@@ -273,6 +273,12 @@ void update() {
     // Center the camera on Mario (X axis only)
     camera_x = mario_x - WINDOW_WIDTH / 2;
 
+    // Clamp to level bounds
+    int level_width_pixels = get_level_width_tiles() * TILE_WIDTH;
+    if (camera_x < 0) camera_x = 0;
+    if (camera_x > level_width_pixels - WINDOW_WIDTH)
+        camera_x = level_width_pixels - WINDOW_WIDTH;
+
     // You can clamp to the max level width too, e.g.
     // if (camera_x > LEVEL_WIDTH_PIXELS - WINDOW_WIDTH) camera_x = LEVEL_WIDTH_PIXELS - WINDOW_WIDTH;
     if (camera_x < 0) camera_x = 0;

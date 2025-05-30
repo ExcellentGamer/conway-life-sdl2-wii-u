@@ -15,7 +15,12 @@ extern float mario_y;
 extern SDL_Color backgroundColor;
 
 int level[MAX_HEIGHT][MAX_WIDTH];
+int level_width_tiles = 0;
 std::string current_tileset = "overworld"; // fallback default
+
+int get_level_width_tiles() {
+    return level_width_tiles;
+}
 
 bool loadLevel(const std::string& filename) {
     std::ifstream file(filename);
@@ -28,6 +33,8 @@ bool loadLevel(const std::string& filename) {
     int y = 0;
     bool marioSpawnSet = false;
     bool bgColorSet = false;
+
+    level_width_tiles = 0; // Reset before loading new level
 
     while (std::getline(file, line)) {
         // Trim whitespace
@@ -81,6 +88,11 @@ bool loadLevel(const std::string& filename) {
                 level[y][x] = value;
             }
             ++x;
+        }
+
+        // Track the widest row
+        if (x > level_width_tiles) {
+            level_width_tiles = x;
         }
 
         ++y;
