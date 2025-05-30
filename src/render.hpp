@@ -1,17 +1,19 @@
 #pragma once
 
+#include <map>
+#include <string>
 #include <SDL_render.h>
 
 typedef struct {
     Uint8 r, g, b, a;
 } RenderColor;
 
-// Background Colors
-const SDL_Color BACKGROUND_OVERWORLD = { 92, 148, 252, 255 };
-const SDL_Color COLOR_CURSOR = { 255, 0, 0, 255 };
-const SDL_Color COLOR_WHITE = { 245, 245, 245, 255 };
-const SDL_Color COLOR_RED = { 245, 25, 25, 255 };
-const SDL_Color COLOR_GREEN = { 25, 245, 25, 255 };
+
+extern std::map<std::string, SDL_Texture*> tilesets;
+
+// Tileset Related
+void load_tilesets(SDL_Renderer* renderer);
+SDL_Texture* get_current_tileset();
 
 // Drawing helpers
 void render_set_color(SDL_Renderer* renderer, SDL_Color color);

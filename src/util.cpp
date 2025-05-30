@@ -1,5 +1,4 @@
 #include <SDL.h>
-#include <SDL_ttf.h>
 #include <math.h>
 #include "util.hpp"
 
@@ -25,20 +24,6 @@ int find_distance(int x1, int y1, int x2, int y2) {
 double clamp(double d, double min, double max) {
   const double t = d < min ? min : d;
   return t > max ? max : t;
-}
-
-void render_text(SDL_Renderer* renderer, TTF_Font* font, const char* text, int x, int y, SDL_Color color) {
-    SDL_Surface* surface = TTF_RenderUTF8_Blended(font, text, color);
-    if (!surface) return;
-
-    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_Rect dst = { x, y, surface->w, surface->h };
-
-    SDL_FreeSurface(surface);
-    if (!texture) return;
-
-    SDL_RenderCopy(renderer, texture, NULL, &dst);
-    SDL_DestroyTexture(texture);
 }
 
 SDL_Rect makeSDLRectfromFloat(float x, float y, int w, int h) {

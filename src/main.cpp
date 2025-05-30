@@ -1,5 +1,4 @@
 #include <SDL.h>
-#include <SDL_ttf.h>
 #include <SDL_image.h>
 #include <coreinit/debug.h>
 #include <coreinit/title.h>
@@ -7,6 +6,7 @@
 #include <sndcore2/core.h>
 #include <sysapp/launch.h>
 #include <whb/proc.h>
+#include <map>
 
 #include "input/CombinedInput.h"
 #include "input/VPADInput.h"
@@ -17,6 +17,7 @@
 #include "util.hpp"
 #include "level.hpp"
 #include "config.hpp"
+#include "font.hpp"
 
 const int MARIO_WIDTH = 44;
 const int MARIO_HEIGHT = 48;
@@ -43,11 +44,13 @@ bool mario_facing_right = true;
 SDL_Window* main_window;
 SDL_Renderer* main_renderer;
 SDL_Event event;
-TTF_Font* game_font = nullptr;
+BitmapFont font;
+
+// Background Color
+SDL_Color backgroundColor = { 0, 0, 0 };
 
 // Textures
 SDL_Texture* mario_texture = NULL;
-SDL_Texture* tileset_texture = NULL;
 AnimationPlayer animationPlayer;
 
 // Helpers
@@ -100,11 +103,6 @@ int initialise() {
         return EXIT_FAILURE;
     }
 
-    if (TTF_Init() == -1) {
-        OSReport("TTF_Init failed: %s\n", TTF_GetError());
-        return EXIT_FAILURE;
-    }
-
     main_window = SDL_CreateWindow("Super Mario Bros.",
                                    SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                                    WINDOW_WIDTH, WINDOW_HEIGHT, 0);
@@ -128,14 +126,7 @@ int initialise() {
     if (!mario_texture) {
         OSReport("Failed to load Mario texture\n");
     }
-    tileset_texture = load_texture(("/vol/external01/smb/assets/tilesets/" + current_tileset + ".png").c_str(), main_renderer);
-    if (!tileset_texture) {
-        OSReport("Failed to load ground texture\n");
-    }
-    game_font = TTF_OpenFont("/vol/external01/smb/assets/fonts/smb.ttf", 32);
-    if (!game_font) {
-        OSReport("Failed to load font: %s\n", TTF_GetError());
-    }
+    font.load(main_renderer, "/vol/external01/smb/assets/font.png", 30, 30, 19);
 
     return EXIT_SUCCESS;
 }
@@ -145,20 +136,11 @@ void shutdown() {
         SDL_DestroyTexture(mario_texture);
         mario_texture = NULL;
     }
-    if (tileset_texture) {
-        SDL_DestroyTexture(tileset_texture);
-        tileset_texture = NULL;
-    }
-    if (game_font) {
-        TTF_CloseFont(game_font);
-        game_font = nullptr;
-    }
 
     SDL_DestroyRenderer(main_renderer);
     SDL_DestroyWindow(main_window);
     IMG_Quit();
     SDL_Quit();
-    TTF_Quit();
 }
 
 void input(Input& input) {
@@ -200,7 +182,6 @@ void input(Input& input) {
 
         if (horizontal_speed > 0) mario_facing_right = true;
         else if (horizontal_speed < 0) mario_facing_right = false;
-
 
         // Horizontal movement
         if (direction == 1) {
@@ -279,10 +260,10 @@ void update() {
     float speedMultiplier = ((speed / maxSpeed) * 1.5f);
     if (speedMultiplier < 0.1f) speedMultiplier = 0.1f;
 
-    render_set_color(main_renderer, BACKGROUND_OVERWORLD);
+    render_set_color(main_renderer, backgroundColor);
     SDL_RenderClear(main_renderer);
 
-    render_level(main_renderer, tileset_texture, camera_x);
+    render_level(main_renderer, get_current_tileset(), camera_x);
 
     SDL_Rect dst = { (int)roundf(mario_x - camera_x), (int)roundf(mario_y), 48, 48 };
     SDL_Rect src = animationPlayer.currentFrame();
@@ -299,14 +280,16 @@ void update() {
     int delta = getDeltaTime();
     animationPlayer.update(delta, paused ? 0.0f : speedMultiplier);
 
+    font.renderText(main_renderer, "MARIO", 50, 25, TextAlign::LEFT, -4);
+    font.renderText(main_renderer, "000000", 50, 50, TextAlign::LEFT, -4); // Replace with a score that can actually be updated
+
     if (paused) {
         SDL_SetRenderDrawBlendMode(main_renderer, SDL_BLENDMODE_BLEND);
         SDL_SetRenderDrawColor(main_renderer, 0, 0, 0, 128);
         SDL_Rect overlay = { 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT };
         SDL_RenderFillRect(main_renderer, &overlay);
 
-        SDL_Color white = {255, 255, 255, 255};
-        render_text(main_renderer, game_font, "Paused", WINDOW_WIDTH / 2 - 50, WINDOW_HEIGHT / 2 - 16, white);
+        font.renderText(main_renderer, "PAUSED", WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, TextAlign::CENTER, 0);
     }
 
     SDL_RenderPresent(main_renderer);
@@ -323,6 +306,7 @@ int main(int argc, char const* argv[]) {
     }
 
     WHBProcInit();
+    load_tilesets(main_renderer);
     loadLevel("/vol/external01/smb/levels/level1.txt");
 
     AXInit();
